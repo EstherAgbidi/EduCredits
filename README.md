@@ -1,23 +1,31 @@
 # EduCredits
 
-A blockchain-based academic achievement token system built on Stacks blockchain that enables educational institutions to track, reward, and transfer academic achievements through a decentralized credit system with integrated grade tracking and GPA calculations.
+A blockchain-based academic achievement token system built on Stacks blockchain that enables educational institutions to track, reward, and transfer academic achievements through a decentralized credit system with integrated grade tracking, GPA calculations, and **cross-institutional support**.
 
 ## Overview
 
-EduCredits transforms traditional academic recognition by creating a transparent, immutable record of student achievements. Students earn credits for academic accomplishments, can transfer credits between peers, and redeem them for rewards or recognition. The system now includes comprehensive grade integration with automatic GPA calculations and course management.
+EduCredits transforms traditional academic recognition by creating a transparent, immutable record of student achievements across multiple educational institutions. Students earn credits for academic accomplishments, can transfer credits between peers (including across institutions), and redeem them for rewards or recognition. The system now includes comprehensive grade integration with automatic GPA calculations, course management, and multi-institution support with partnership networks.
 
 ## Features
 
-- **Student Registration**: Secure registration system for students on the blockchain
+### Core Features
+- **Student Registration**: Secure registration system for students on the blockchain with institution affiliation
 - **Credit Awarding**: Instructors can award credits for various academic achievements
 - **Grade Integration**: Complete grade tracking system with letter grades (A, B, C, D, F) and variations
 - **GPA Calculation**: Automatic GPA calculation based on grades and credit hours
-- **Course Management**: Create and manage courses with credit hour specifications
+- **Course Management**: Create and manage courses with credit hour specifications and institutional affiliation
 - **Achievement Tracking**: Comprehensive logging of all student achievements
-- **Credit Transfer**: Peer-to-peer credit transfers between registered students
+- **Credit Transfer**: Peer-to-peer credit transfers between registered students (same or different institutions)
 - **Credit Redemption**: Students can redeem accumulated credits for rewards
-- **Instructor Management**: Permission-based system for instructor access
-- **Analytics**: Track total credits, students, courses, and achievement distributions
+- **Instructor Management**: Permission-based system for instructor access with institutional verification
+- **Analytics**: Track total credits, students, courses, institutions, and achievement distributions
+
+### Multi-Institution Features
+- **Institution Registration**: Register educational institutions with accreditation levels and administrative control
+- **Partnership Networks**: Establish recognition partnerships between institutions with customizable transfer rates
+- **Cross-Institutional Transfers**: Transfer credits between students at different institutions with partnership-based conversion rates
+- **Institutional Analytics**: Track credits, transfers, and partnerships per institution
+- **Distributed Administration**: Each institution manages its own students, instructors, and courses while maintaining interoperability
 
 ## Grade Integration System
 
@@ -42,24 +50,53 @@ Credits are automatically awarded based on the grade received:
 - D grades: 40% of course credit hours
 - F grades: 0% of course credit hours
 
+## Multi-Institution System
+
+### Institution Structure
+- **Institution ID**: Unique 10-character identifier for each institution
+- **Accreditation Level**: 1-5 scale representing institutional accreditation status
+- **Administrative Control**: Each institution has an admin who can manage students and instructors
+- **Active Status**: Institutions can be activated/deactivated
+
+### Partnership System
+- **Bilateral Partnerships**: Institutions can establish mutual recognition agreements
+- **Transfer Rates**: Customizable credit conversion rates (0-100%) between partner institutions
+- **Cross-Institutional Transfers**: Students can transfer credits across institutions based on partnership agreements
+
+### Examples of Transfer Rates
+- **Full Partnership**: 100% transfer rate (1:1 credit conversion)
+- **Standard Partnership**: 80% transfer rate (10 credits become 8 credits)
+- **Limited Partnership**: 60% transfer rate (10 credits become 6 credits)
+
 ## Smart Contract Functions
 
 ### Public Functions
 
+#### Institution Management
+- `register-institution(institution-id, name, admin, accreditation-level)` - Register a new educational institution
+- `establish-partnership(institution-a, institution-b, transfer-rate)` - Create partnership between institutions
+
 #### Student & Instructor Management
-- `register-student(student)` - Register a new student in the system
-- `grant-instructor-permission(instructor)` - Grant teaching permissions to an instructor
+- `register-student(student, institution-id)` - Register a new student with an institution
+- `grant-instructor-permission(instructor, institution-id)` - Grant teaching permissions to an instructor at an institution
 
 #### Course Management
-- `create-course(course-id, course-name, credit-hours)` - Create a new course with specified credit hours
+- `create-course(course-id, course-name, credit-hours, institution-id)` - Create a new course at a specific institution
 
 #### Grade & Credit Management
 - `award-grade(student, course-id, grade)` - Award a grade for a course (automatically calculates credits and GPA)
 - `award-credits(student, amount, achievement)` - Award credits for academic achievements (legacy function)
-- `transfer-credits(recipient, amount)` - Transfer credits between students
+- `transfer-credits-cross-institution(recipient, amount)` - Transfer credits between students (supports cross-institutional transfers)
+- `transfer-credits(recipient, amount)` - Transfer credits between students (wrapper for cross-institutional function)
 - `redeem-credits(amount)` - Redeem credits for rewards
 
 ### Read-Only Functions
+
+#### Institution Information
+- `get-institution-info(institution-id)` - Get institution details including name, admin, and accreditation level
+- `get-partnership-info(institution-a, institution-b)` - Get partnership details between two institutions
+- `get-institution-credits(institution-id)` - Get total credits awarded by an institution
+- `get-cross-institutional-transfers(from-institution, to-institution)` - Get transfer count between institutions
 
 #### Student Information
 - `get-student-credits(student)` - Get current credit balance for a student
@@ -67,15 +104,19 @@ Credits are automatically awarded based on the grade received:
 - `get-student-gpa(student)` - Get student's current GPA (multiplied by 100 for precision)
 - `get-student-gpa-data(student)` - Get detailed GPA data including total grade points and credit hours
 - `get-student-courses(student)` - Get list of courses taken by student
+- `get-student-institution(student)` - Get student's affiliated institution
 
 #### Course & Grade Information
 - `get-course-grade(student, course-id)` - Get grade information for a specific course
 - `get-course-info(course-id)` - Get course details including name, credit hours, and instructor
+- `get-course-institution(course-id)` - Get institution offering a specific course
+- `get-instructor-institution(instructor)` - Get instructor's affiliated institution
 
 #### System Statistics
 - `get-total-credits()` - Get total credits in the system
 - `get-total-students()` - Get total number of registered students
 - `get-total-courses()` - Get total number of courses created
+- `get-total-institutions()` - Get total number of registered institutions
 - `get-achievement-count(achievement-type)` - Get count of specific achievement type
 - `is-instructor(address)` - Check if address has instructor permissions
 
@@ -117,19 +158,51 @@ clarinet deploy --testnet
 
 ## Usage Examples
 
-### Basic Setup
+### Multi-Institution Setup
 ```clarity
-;; Register a student
-(contract-call? .educredits register-student 'ST1STUDENT123...)
+;; Register institutions
+(contract-call? .educredits register-institution "MIT" "Massachusetts Institute of Technology" 'ST1ADMIN123... u5)
+(contract-call? .educredits register-institution "HARVARD" "Harvard University" 'ST1ADMIN456... u5)
 
-;; Grant instructor permissions
-(contract-call? .educredits grant-instructor-permission 'ST1INSTRUCTOR456...)
+;; Establish partnership (90% transfer rate)
+(contract-call? .educredits establish-partnership "MIT" "HARVARD" u90)
 
-;; Create a course
-(contract-call? .educredits create-course "CS101" "Introduction to Computer Science" u3)
+;; Register students with their institutions
+(contract-call? .educredits register-student 'ST1STUDENT123... "MIT")
+(contract-call? .educredits register-student 'ST1STUDENT456... "HARVARD")
 ```
 
-### Grade Management
+### Cross-Institutional Operations
+```clarity
+;; Grant instructor permissions at specific institution
+(contract-call? .educredits grant-instructor-permission 'ST1INSTRUCTOR789... "MIT")
+
+;; Create course at MIT
+(contract-call? .educredits create-course "CS101" "Introduction to Computer Science" u3 "MIT")
+
+;; Award grade to MIT student
+(contract-call? .educredits award-grade 'ST1STUDENT123... "CS101" "A")
+
+;; Transfer credits from MIT student to Harvard student (90% rate applies)
+(contract-call? .educredits transfer-credits-cross-institution 'ST1STUDENT456... u100)
+```
+
+### Institution Analytics
+```clarity
+;; Get institution information
+(contract-call? .educredits get-institution-info "MIT")
+
+;; Check partnership details
+(contract-call? .educredits get-partnership-info "MIT" "HARVARD")
+
+;; Get institution's total credits awarded
+(contract-call? .educredits get-institution-credits "MIT")
+
+;; Get cross-institutional transfer statistics
+(contract-call? .educredits get-cross-institutional-transfers "MIT" "HARVARD")
+```
+
+### Basic Operations
 ```clarity
 ;; Award a grade (automatically calculates credits and updates GPA)
 (contract-call? .educredits award-grade 'ST1STUDENT123... "CS101" "A")
@@ -139,18 +212,9 @@ clarinet deploy --testnet
 
 ;; Get detailed grade information for a course
 (contract-call? .educredits get-course-grade 'ST1STUDENT123... "CS101")
-```
 
-### Legacy Credit System
-```clarity
-;; Award credits for completing an assignment (legacy function)
-(contract-call? .educredits award-credits 'ST1STUDENT123... u100 "Assignment Completion")
-
-;; Transfer credits between students
-(contract-call? .educredits transfer-credits 'ST1STUDENT456... u50)
-
-;; Check student balance
-(contract-call? .educredits get-student-credits 'ST1STUDENT123...)
+;; Check student's institution
+(contract-call? .educredits get-student-institution 'ST1STUDENT123...)
 ```
 
 ## Error Codes
@@ -164,6 +228,29 @@ clarinet deploy --testnet
 - `u106` - Course already exists
 - `u107` - Course not found
 - `u108` - Invalid credit hours (must be 1-6)
+- `u109` - Institution not found
+- `u110` - Institution already exists
+- `u111` - Institution not recognized (no partnership)
+- `u112` - Invalid institution ID
+- `u113` - Transfer not allowed
+
+## Multi-Institution Benefits
+
+### For Students
+- **Portable Credits**: Credits earned at one institution can be transferred to partner institutions
+- **Cross-Institutional Recognition**: Academic achievements are recognized across institutional boundaries
+- **Flexible Learning Paths**: Students can take courses at multiple institutions within the network
+
+### For Institutions
+- **Partnership Networks**: Build academic alliances with other institutions
+- **Quality Assurance**: Accreditation levels help maintain academic standards
+- **Administrative Control**: Each institution maintains control over its academic processes
+- **Transparent Transfers**: All credit transfers are recorded on the blockchain for accountability
+
+### For the Academic Community
+- **Standardization**: Common credit system across participating institutions
+- **Transparency**: All academic records and transfers are immutable and verifiable
+- **Innovation**: Encourages new forms of academic collaboration and student mobility
 
 ## GPA Calculation
 
@@ -174,21 +261,18 @@ The system automatically calculates GPA using the standard 4.0 scale:
 
 ## Security Features
 
-- **Permission-based access**: Only contract owner can register students and grant instructor permissions
+- **Permission-based access**: Only contract owner can register institutions; institution admins manage their own students/instructors
 - **Input validation**: All parameters are validated for type, length, and range
-- **Instructor verification**: Only authorized instructors can award grades for their courses
-- **Data integrity**: Immutable grade records prevent tampering
+- **Institutional verification**: Only authorized personnel can perform actions within their institution
+- **Partnership validation**: Credit transfers require established partnerships between institutions
+- **Data integrity**: Immutable grade records and transfer history prevent tampering
 - **Error handling**: Comprehensive error codes for all failure scenarios
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/grade-integration`)
+2. Create a feature branch (`git checkout -b feature/multi-institution-support`)
 3. Make your changes
 4. Add tests for new functionality
 5. Run `clarinet check` to ensure contract validity
 6. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
