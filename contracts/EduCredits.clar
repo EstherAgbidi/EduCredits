@@ -1,5 +1,5 @@
-;; EduCredits - Academic Achievement Token System with Multi-Institution Support
-;; A blockchain-based system for tracking and rewarding academic achievements with grade integration and cross-institutional support
+;; EduCredits - Academic Achievement Token System with Multi-Institution Support and NFT Badges
+;; A blockchain-based system for tracking and rewarding academic achievements with grade integration, cross-institutional support, and unique NFT achievement badges
 
 ;; Constants
 (define-constant contract-owner tx-sender)
@@ -17,6 +17,11 @@
 (define-constant err-institution-not-recognized (err u111))
 (define-constant err-invalid-institution-id (err u112))
 (define-constant err-transfer-not-allowed (err u113))
+(define-constant err-nft-not-found (err u114))
+(define-constant err-nft-already-minted (err u115))
+(define-constant err-milestone-not-met (err u116))
+(define-constant err-invalid-milestone-type (err u117))
+(define-constant err-unauthorized (err u118))
 
 ;; Grade point constants (multiplied by 100 for precision)
 (define-constant grade-a u400)  ;; 4.0 * 100
@@ -31,11 +36,15 @@
 (define-constant grade-d u100)  ;; 1.0 * 100
 (define-constant grade-f u0)    ;; 0.0 * 100
 
+;; NFT Trait
+(define-non-fungible-token achievement-badge uint)
+
 ;; Data Variables
 (define-data-var total-credits uint u0)
 (define-data-var total-students uint u0)
 (define-data-var total-courses uint u0)
 (define-data-var total-institutions uint u0)
+(define-data-var nft-id-counter uint u0)
 
 ;; Data Maps - Original
 (define-map student-credits principal uint)
@@ -57,6 +66,18 @@
 (define-map course-institution (string-ascii 20) (string-ascii 10))
 (define-map institution-credits (string-ascii 10) uint)
 (define-map cross-institutional-transfers {from-institution: (string-ascii 10), to-institution: (string-ascii 10)} uint)
+
+;; NFT Achievement Badge Maps
+(define-map nft-metadata uint {
+  milestone-type: (string-ascii 30),
+  description: (string-ascii 200),
+  institution: (string-ascii 10),
+  awarded-at: uint,
+  metadata-uri: (optional (string-ascii 256))
+})
+(define-map student-nft-badges principal (list 50 uint))
+(define-map milestone-achievements {student: principal, milestone-type: (string-ascii 30)} bool)
+(define-map institution-nft-count (string-ascii 10) uint)
 
 ;; Public Functions
 
@@ -80,6 +101,7 @@
       active: true
     })
     (map-set institution-credits institution-id u0)
+    (map-set institution-nft-count institution-id u0)
     (var-set total-institutions (+ (var-get total-institutions) u1))
     (ok true)
   )
@@ -378,52 +400,7 @@
 
 ;; Transfer credits between students (original function - now supports cross-institutional)
 (define-public (transfer-credits (recipient principal) (amount uint))
-  (let (
-    (sender-credits (default-to u0 (map-get? student-credits tx-sender)))
-    (recipient-credits (default-to u0 (map-get? student-credits recipient)))
-    (sender-institution (unwrap! (map-get? student-institution tx-sender) err-not-found))
-    (recipient-institution (unwrap! (map-get? student-institution recipient) err-not-found))
-    (partnership (map-get? institution-partnerships {institution-a: sender-institution, institution-b: recipient-institution}))
-    (transfer-count-key {from-institution: sender-institution, to-institution: recipient-institution})
-    (current-transfer-count (default-to u0 (map-get? cross-institutional-transfers transfer-count-key)))
-  )
-    (asserts! (>= sender-credits amount) err-insufficient-credits)
-    (asserts! (> amount u0) err-invalid-amount)
-    (asserts! (is-some (map-get? student-credits recipient)) err-not-found)
-    
-    ;; Check if institutions are different and have partnership
-    (if (is-eq sender-institution recipient-institution)
-      ;; Same institution transfer (normal transfer)
-      (begin
-        (map-set student-credits tx-sender (- sender-credits amount))
-        (map-set student-credits recipient (+ recipient-credits amount))
-        (ok true)
-      )
-      ;; Cross-institutional transfer
-      (match partnership
-        partnership-data
-        (let (
-          (transfer-rate (get transfer-rate partnership-data))
-          (adjusted-amount (/ (* amount transfer-rate) u100))
-        )
-          (asserts! (get recognized partnership-data) err-institution-not-recognized)
-          (asserts! (> adjusted-amount u0) err-transfer-not-allowed)
-          
-          ;; Update sender credits
-          (map-set student-credits tx-sender (- sender-credits amount))
-          
-          ;; Update recipient credits with adjusted amount
-          (map-set student-credits recipient (+ recipient-credits adjusted-amount))
-          
-          ;; Update transfer statistics
-          (map-set cross-institutional-transfers transfer-count-key (+ current-transfer-count u1))
-          
-          (ok true)
-        )
-        err-institution-not-recognized
-      )
-    )
-  )
+  (transfer-credits-cross-institution recipient amount)
 )
 
 ;; Redeem credits for rewards
@@ -446,6 +423,188 @@
     (var-set total-credits (- (var-get total-credits) amount))
     
     (ok true)
+  )
+)
+
+;; NFT Achievement Badge Functions
+
+;; Mint NFT achievement badge
+(define-public (mint-achievement-badge 
+  (student principal) 
+  (milestone-type (string-ascii 30)) 
+  (description (string-ascii 200))
+  (metadata-uri (optional (string-ascii 256))))
+  (let (
+    (student-inst (unwrap! (map-get? student-institution student) err-not-found))
+    (institution-data (unwrap! (map-get? institutions student-inst) err-institution-not-found))
+    (instructor-inst (map-get? instructor-institution tx-sender))
+    (is-instructor (default-to false (map-get? instructor-permissions tx-sender)))
+    (is-admin (is-eq tx-sender (get admin institution-data)))
+    (new-nft-id (+ (var-get nft-id-counter) u1))
+    (current-badges (default-to (list) (map-get? student-nft-badges student)))
+    (milestone-key {student: student, milestone-type: milestone-type})
+    (current-inst-nft-count (default-to u0 (map-get? institution-nft-count student-inst)))
+    (current-block-height stacks-block-height)
+  )
+    ;; Validate permissions
+    (asserts! (or (is-eq tx-sender contract-owner) is-admin 
+                  (and is-instructor (is-eq (some student-inst) instructor-inst))) err-owner-only)
+    ;; Validate inputs
+    (asserts! (is-some (map-get? student-credits student)) err-not-found)
+    (asserts! (> (len milestone-type) u0) err-invalid-milestone-type)
+    (asserts! (<= (len milestone-type) u30) err-invalid-milestone-type)
+    (asserts! (> (len description) u0) err-invalid-amount)
+    (asserts! (<= (len description) u200) err-invalid-amount)
+    (asserts! (get active institution-data) err-institution-not-found)
+    ;; Check if student already has this milestone badge
+    (asserts! (is-none (map-get? milestone-achievements milestone-key)) err-nft-already-minted)
+    
+    ;; Validate metadata-uri if provided
+    (match metadata-uri
+      uri (asserts! (<= (len uri) u256) err-invalid-amount)
+      true
+    )
+    
+    ;; Mint NFT to student
+    (try! (nft-mint? achievement-badge new-nft-id student))
+    
+    ;; Store NFT metadata
+    (map-set nft-metadata new-nft-id {
+      milestone-type: milestone-type,
+      description: description,
+      institution: student-inst,
+      awarded-at: current-block-height,
+      metadata-uri: (if (is-some metadata-uri) metadata-uri none)
+    })
+    
+    ;; Add NFT to student's badge list
+    (let (
+      (updated-badges (unwrap! (as-max-len? (append current-badges new-nft-id) u50) err-invalid-amount))
+    )
+      (map-set student-nft-badges student updated-badges)
+    )
+    
+    ;; Mark milestone as achieved
+    (map-set milestone-achievements milestone-key true)
+    
+    ;; Update institution NFT count
+    (map-set institution-nft-count student-inst (+ current-inst-nft-count u1))
+    
+    ;; Increment NFT counter
+    (var-set nft-id-counter new-nft-id)
+    
+    (ok new-nft-id)
+  )
+)
+
+;; Transfer NFT achievement badge
+(define-public (transfer-achievement-badge (nft-id uint) (recipient principal))
+  (let (
+    (token-owner (unwrap! (nft-get-owner? achievement-badge nft-id) err-nft-not-found))
+    (nft-meta (unwrap! (map-get? nft-metadata nft-id) err-nft-not-found))
+    (recipient-inst-opt (map-get? student-institution recipient))
+  )
+    ;; Validate sender is the owner
+    (asserts! (is-eq tx-sender token-owner) err-unauthorized)
+    ;; Validate recipient is a registered student
+    (asserts! (is-some recipient-inst-opt) err-not-found)
+    
+    ;; Transfer NFT
+    (try! (nft-transfer? achievement-badge nft-id tx-sender recipient))
+    
+    ;; Update sender's badge list
+    (let (
+      (sender-badges (default-to (list) (map-get? student-nft-badges tx-sender)))
+      (updated-sender-badges (filter-nft-from-list sender-badges nft-id))
+    )
+      (map-set student-nft-badges tx-sender updated-sender-badges)
+    )
+    
+    ;; Update recipient's badge list
+    (let (
+      (recipient-badges (default-to (list) (map-get? student-nft-badges recipient)))
+      (updated-recipient-badges (unwrap! (as-max-len? (append recipient-badges nft-id) u50) err-invalid-amount))
+    )
+      (map-set student-nft-badges recipient updated-recipient-badges)
+    )
+    
+    (ok true)
+  )
+)
+
+;; Helper function to filter NFT from list
+(define-private (filter-nft-from-list (nft-list (list 50 uint)) (nft-to-remove uint))
+  (filter is-not-target nft-list)
+)
+
+;; Helper function for filtering
+(define-private (is-not-target (nft-id uint))
+  (not (is-eq nft-id nft-id))
+)
+
+;; Auto-mint badge based on milestone criteria
+(define-public (auto-mint-milestone-badge (student principal) (milestone-type (string-ascii 30)))
+  (let (
+    (student-data (unwrap! (map-get? student-gpa-data student) err-not-found))
+    (credit-balance (default-to u0 (map-get? student-credits student)))
+    (student-gpa (get gpa student-data))
+    (milestone-met (check-milestone-criteria credit-balance student-gpa milestone-type))
+  )
+    (asserts! milestone-met err-milestone-not-met)
+    
+    ;; Mint badge with predefined descriptions
+    (let (
+      (description (get-milestone-description milestone-type))
+      (validated-description (unwrap! description err-invalid-milestone-type))
+    )
+      (mint-achievement-badge student milestone-type validated-description none)
+    )
+  )
+)
+
+;; Check if milestone criteria is met
+(define-private (check-milestone-criteria (credits uint) (gpa uint) (milestone-type (string-ascii 30)))
+  (if (is-eq milestone-type "DEAN_LIST")
+    (>= gpa u350)  ;; 3.5 GPA or higher
+    (if (is-eq milestone-type "HONORS_GRADUATE")
+      (and (>= gpa u350) (>= credits u120))  ;; 3.5 GPA and 120+ credits
+      (if (is-eq milestone-type "SUMMA_CUM_LAUDE")
+        (>= gpa u390)  ;; 3.9 GPA or higher
+        (if (is-eq milestone-type "PERFECT_SEMESTER")
+          (>= gpa u400)  ;; 4.0 GPA
+          (if (is-eq milestone-type "CENTURY_CLUB")
+            (>= credits u100)  ;; 100+ credits
+            (if (is-eq milestone-type "RESEARCH_EXCELLENCE")
+              (>= credits u50)  ;; Custom criteria
+              false
+            )
+          )
+        )
+      )
+    )
+  )
+)
+
+;; Get milestone description
+(define-private (get-milestone-description (milestone-type (string-ascii 30)))
+  (if (is-eq milestone-type "DEAN_LIST")
+    (some "Achieved Dean's List with GPA of 3.5 or higher")
+    (if (is-eq milestone-type "HONORS_GRADUATE")
+      (some "Graduated with Honors: 3.5 GPA and 120+ credits")
+      (if (is-eq milestone-type "SUMMA_CUM_LAUDE")
+        (some "Summa Cum Laude: Exceptional academic excellence with 3.9+ GPA")
+        (if (is-eq milestone-type "PERFECT_SEMESTER")
+          (some "Perfect Semester: Achieved 4.0 GPA")
+          (if (is-eq milestone-type "CENTURY_CLUB")
+            (some "Century Club: Earned 100+ academic credits")
+            (if (is-eq milestone-type "RESEARCH_EXCELLENCE")
+              (some "Research Excellence: Outstanding contribution to academic research")
+              none
+            )
+          )
+        )
+      )
+    )
   )
 )
 
@@ -564,4 +723,52 @@
 ;; Check if address is an instructor
 (define-read-only (is-instructor (address principal))
   (ok (default-to false (map-get? instructor-permissions address)))
+)
+
+;; NFT Read-only Functions
+
+;; Get NFT metadata
+(define-read-only (get-nft-metadata (nft-id uint))
+  (match (map-get? nft-metadata nft-id)
+    metadata (ok metadata)
+    err-nft-not-found
+  )
+)
+
+;; Get student NFT badges
+(define-read-only (get-student-nft-badges (student principal))
+  (ok (default-to (list) (map-get? student-nft-badges student)))
+)
+
+;; Check if student has milestone badge
+(define-read-only (has-milestone-badge (student principal) (milestone-type (string-ascii 30)))
+  (ok (default-to false (map-get? milestone-achievements {student: student, milestone-type: milestone-type})))
+)
+
+;; Get institution NFT count
+(define-read-only (get-institution-nft-count (institution-id (string-ascii 10)))
+  (ok (default-to u0 (map-get? institution-nft-count institution-id)))
+)
+
+;; Get total NFTs minted
+(define-read-only (get-total-nfts-minted)
+  (ok (var-get nft-id-counter))
+)
+
+;; Get NFT owner
+(define-read-only (get-nft-owner (nft-id uint))
+  (ok (nft-get-owner? achievement-badge nft-id))
+)
+
+;; Get last token ID
+(define-read-only (get-last-token-id)
+  (ok (var-get nft-id-counter))
+)
+
+;; Get token URI (standard NFT function)
+(define-read-only (get-token-uri (nft-id uint))
+  (match (map-get? nft-metadata nft-id)
+    metadata (ok (get metadata-uri metadata))
+    err-nft-not-found
+  )
 )
