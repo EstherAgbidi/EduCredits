@@ -1,10 +1,10 @@
 # EduCredits
 
-A blockchain-based academic achievement token system built on Stacks blockchain that enables educational institutions to track, reward, and transfer academic achievements through a decentralized credit system with integrated grade tracking, GPA calculations, and **cross-institutional support**.
+A blockchain-based academic achievement token system built on Stacks blockchain that enables educational institutions to track, reward, and transfer academic achievements through a decentralized credit system with integrated grade tracking, GPA calculations, cross-institutional support, and **unique NFT achievement badges**.
 
 ## Overview
 
-EduCredits transforms traditional academic recognition by creating a transparent, immutable record of student achievements across multiple educational institutions. Students earn credits for academic accomplishments, can transfer credits between peers (including across institutions), and redeem them for rewards or recognition. The system now includes comprehensive grade integration with automatic GPA calculations, course management, and multi-institution support with partnership networks.
+EduCredits transforms traditional academic recognition by creating a transparent, immutable record of student achievements across multiple educational institutions. Students earn credits for academic accomplishments, can transfer credits between peers (including across institutions), redeem them for rewards, and **earn unique NFT badges for special academic milestones**. The system includes comprehensive grade integration with automatic GPA calculations, course management, multi-institution support with partnership networks, and a verifiable NFT badge system for celebrating exceptional achievements.
 
 ## Features
 
@@ -26,6 +26,53 @@ EduCredits transforms traditional academic recognition by creating a transparent
 - **Cross-Institutional Transfers**: Transfer credits between students at different institutions with partnership-based conversion rates
 - **Institutional Analytics**: Track credits, transfers, and partnerships per institution
 - **Distributed Administration**: Each institution manages its own students, instructors, and courses while maintaining interoperability
+
+### NFT Achievement Badge Features 🆕
+- **Unique Digital Badges**: Mint NFT tokens for special academic milestones and achievements
+- **Milestone Tracking**: Automatic milestone verification and badge eligibility checking
+- **Badge Metadata**: Rich metadata including milestone type, description, institution, and award date
+- **Transferable Badges**: NFT badges can be transferred between registered students
+- **Predefined Milestones**: Built-in milestone types with automatic criteria validation
+- **Custom Metadata URIs**: Support for external metadata links (IPFS, Arweave, etc.)
+- **Institutional Badge Analytics**: Track NFT badges minted per institution
+- **Immutable Proof**: Permanent, verifiable record of academic excellence on the blockchain
+
+## NFT Achievement Badge System
+
+### Predefined Milestone Types
+
+1. **DEAN_LIST** 🎓
+   - Criteria: GPA ≥ 3.5
+   - Description: "Achieved Dean's List with GPA of 3.5 or higher"
+
+2. **HONORS_GRADUATE** 🏆
+   - Criteria: GPA ≥ 3.5 AND Credits ≥ 120
+   - Description: "Graduated with Honors: 3.5 GPA and 120+ credits"
+
+3. **SUMMA_CUM_LAUDE** ⭐
+   - Criteria: GPA ≥ 3.9
+   - Description: "Summa Cum Laude: Exceptional academic excellence with 3.9+ GPA"
+
+4. **PERFECT_SEMESTER** 💯
+   - Criteria: GPA = 4.0
+   - Description: "Perfect Semester: Achieved 4.0 GPA"
+
+5. **CENTURY_CLUB** 💪
+   - Criteria: Credits ≥ 100
+   - Description: "Century Club: Earned 100+ academic credits"
+
+6. **RESEARCH_EXCELLENCE** 🔬
+   - Criteria: Credits ≥ 50 (customizable)
+   - Description: "Research Excellence: Outstanding contribution to academic research"
+
+### NFT Badge Benefits
+
+- **Permanent Achievement Record**: Badges are stored permanently on the blockchain
+- **Verifiable Credentials**: Anyone can verify the authenticity of academic achievements
+- **Portable Recognition**: NFT badges can be displayed in digital wallets and portfolios
+- **Cross-Platform Compatibility**: Standard NFT format works across the Stacks ecosystem
+- **Enhanced Credibility**: Blockchain-verified achievements carry more weight with employers
+- **Collector Value**: Students build a comprehensive collection of their academic journey
 
 ## Grade Integration System
 
@@ -90,6 +137,11 @@ Credits are automatically awarded based on the grade received:
 - `transfer-credits(recipient, amount)` - Transfer credits between students (wrapper for cross-institutional function)
 - `redeem-credits(amount)` - Redeem credits for rewards
 
+#### NFT Achievement Badge Functions 🆕
+- `mint-achievement-badge(student, milestone-type, description, metadata-uri)` - Mint a unique NFT badge for a student
+- `transfer-achievement-badge(nft-id, recipient)` - Transfer an NFT badge to another registered student
+- `auto-mint-milestone-badge(student, milestone-type)` - Automatically mint badge if milestone criteria is met
+
 ### Read-Only Functions
 
 #### Institution Information
@@ -119,6 +171,16 @@ Credits are automatically awarded based on the grade received:
 - `get-total-institutions()` - Get total number of registered institutions
 - `get-achievement-count(achievement-type)` - Get count of specific achievement type
 - `is-instructor(address)` - Check if address has instructor permissions
+
+#### NFT Badge Information 🆕
+- `get-nft-metadata(nft-id)` - Get complete metadata for an NFT badge
+- `get-student-nft-badges(student)` - Get all NFT badges owned by a student
+- `has-milestone-badge(student, milestone-type)` - Check if student has achieved a specific milestone
+- `get-institution-nft-count(institution-id)` - Get total NFT badges minted by an institution
+- `get-total-nfts-minted()` - Get total number of NFT badges minted system-wide
+- `get-nft-owner(nft-id)` - Get the current owner of an NFT badge
+- `get-last-token-id()` - Get the most recently minted NFT token ID
+- `get-token-uri(nft-id)` - Get the metadata URI for an NFT badge (standard NFT function)
 
 ## Getting Started
 
@@ -157,6 +219,37 @@ clarinet deploy --testnet
 ```
 
 ## Usage Examples
+
+### NFT Achievement Badge Examples 🆕
+
+```clarity
+;; Mint a custom achievement badge
+(contract-call? .educredits mint-achievement-badge 
+  'ST1STUDENT123... 
+  "RESEARCH_EXCELLENCE" 
+  "Outstanding research contribution to quantum computing" 
+  (some "ipfs://QmX..."))
+
+;; Auto-mint Dean's List badge (checks criteria automatically)
+(contract-call? .educredits auto-mint-milestone-badge 
+  'ST1STUDENT123... 
+  "DEAN_LIST")
+
+;; Transfer badge to another student
+(contract-call? .educredits transfer-achievement-badge u1 'ST1STUDENT456...)
+
+;; Get all badges for a student
+(contract-call? .educredits get-student-nft-badges 'ST1STUDENT123...)
+
+;; Check if student has specific milestone
+(contract-call? .educredits has-milestone-badge 'ST1STUDENT123... "SUMMA_CUM_LAUDE")
+
+;; Get badge metadata
+(contract-call? .educredits get-nft-metadata u1)
+
+;; Get institution's total badges minted
+(contract-call? .educredits get-institution-nft-count "MIT")
+```
 
 ### Multi-Institution Setup
 ```clarity
@@ -233,6 +326,33 @@ clarinet deploy --testnet
 - `u111` - Institution not recognized (no partnership)
 - `u112` - Invalid institution ID
 - `u113` - Transfer not allowed
+- `u114` - NFT not found 🆕
+- `u115` - NFT already minted for this milestone 🆕
+- `u116` - Milestone criteria not met 🆕
+- `u117` - Invalid milestone type 🆕
+- `u118` - Unauthorized action 🆕
+
+## NFT Achievement Badge Benefits 🆕
+
+### For Students
+- **Digital Portfolio**: Build a verifiable collection of academic achievements
+- **Enhanced Credibility**: Blockchain-verified badges provide tamper-proof credentials
+- **Career Advancement**: Share badges with potential employers and graduate schools
+- **Motivation**: Visual representation of achievements encourages continued excellence
+- **Ownership**: True ownership of achievement records that can't be revoked
+
+### For Institutions
+- **Brand Recognition**: NFT badges carry institutional branding and prestige
+- **Quality Assurance**: Verifiable proof of institutional standards and excellence
+- **Alumni Engagement**: Create lasting connections through permanent achievement records
+- **Innovation Leadership**: Demonstrate technological advancement in education
+- **Analytics**: Track milestone achievements and student excellence trends
+
+### For the Academic Community
+- **Standardization**: Common framework for recognizing academic milestones
+- **Transparency**: Public verification of academic achievements
+- **Interoperability**: NFT badges work across different platforms and applications
+- **Innovation**: Opens new possibilities for credential verification and recognition
 
 ## Multi-Institution Benefits
 
@@ -266,12 +386,28 @@ The system automatically calculates GPA using the standard 4.0 scale:
 - **Institutional verification**: Only authorized personnel can perform actions within their institution
 - **Partnership validation**: Credit transfers require established partnerships between institutions
 - **Data integrity**: Immutable grade records and transfer history prevent tampering
+- **NFT ownership**: Only NFT owners can transfer their badges
+- **Milestone validation**: Automatic verification prevents fraudulent badge minting
 - **Error handling**: Comprehensive error codes for all failure scenarios
+
+## Technical Specifications
+
+### NFT Standard Compliance
+- Implements Stacks NFT trait with standard functions
+- Compatible with Stacks wallets and NFT marketplaces
+- Supports metadata URIs for rich media (IPFS, Arweave, etc.)
+- Transferable with proper ownership verification
+
+### Data Storage
+- On-chain metadata for core achievement information
+- Optional off-chain metadata URIs for additional content
+- Efficient storage using uint identifiers and indexed maps
+- Maximum 50 NFT badges per student (configurable)
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/multi-institution-support`)
+2. Create a feature branch (`git checkout -b feature/nft-achievement-badges`)
 3. Make your changes
 4. Add tests for new functionality
 5. Run `clarinet check` to ensure contract validity
